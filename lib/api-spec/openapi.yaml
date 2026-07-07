@@ -3,20 +3,23 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Netflixy cookie session manager API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: access
+    description: Public extension access
+  - name: sessions
+    description: Admin session management
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +27,92 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /access:
+    get:
+      operationId: getAccess
+      tags: [access]
+      summary: Get a random active cookie session (used by the extension)
+      responses:
+        "200":
+          description: Access response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessResponse"
+
+  /admin/sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List all cookie sessions
+      responses:
+        "200":
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Add a new cookie session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Created session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /admin/sessions/{id}:
+    patch:
+      operationId: updateSession
+      tags: [sessions]
+      summary: Update a session (toggle active, rename)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionPatch"
+      responses:
+        "200":
+          description: Updated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteSession
+      tags: [sessions]
+      summary: Delete a session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +123,59 @@ components:
       required:
         - status
 
+    AccessResponse:
+      type: object
+      properties:
+        found:
+          type: boolean
+        cookieValue:
+          type: ["string", "null"]
+        label:
+          type: ["string", "null"]
+        activeCount:
+          type: integer
+      required:
+        - found
+        - activeCount
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: integer
+        label:
+          type: string
+        cookieValue:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - label
+        - cookieValue
+        - isActive
+        - createdAt
+
+    SessionInput:
+      type: object
+      properties:
+        label:
+          type: string
+          minLength: 1
+        cookieValue:
+          type: string
+          minLength: 1
+      required:
+        - label
+        - cookieValue
+
+    SessionPatch:
+      type: object
+      properties:
+        label:
+          type: string
+          minLength: 1
+        isActive:
+          type: boolean
