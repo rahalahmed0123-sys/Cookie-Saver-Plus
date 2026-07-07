@@ -137,12 +137,31 @@ function PlayerScreen({ cookieValue }: { cookieValue: string }) {
 
   if (Platform.OS === 'web') {
     return (
-      <View style={[styles(colors).webFallback, { paddingTop: Math.max(insets.top, 67) }]}>
-        <Feather name="smartphone" size={48} color={colors.primary} />
-        <Text style={styles(colors).webFallbackTitle}>Open on your phone</Text>
+      <View style={[styles(colors).webFallback, { paddingTop: Math.max(insets.top, 107) }]}>
+        <View style={styles(colors).webSuccessBadge}>
+          <Feather name="check-circle" size={40} color={colors.primary} />
+        </View>
+        <Text style={styles(colors).webFallbackTitle}>Session Ready</Text>
         <Text style={styles(colors).webFallbackText}>
-          Scan the QR code in the URL bar with Expo Go to stream on your device.
+          Cookie fetched successfully. On a phone this opens Netflix automatically — on desktop, click below to open Netflix in a new tab, then paste the cookie manually if needed.
         </Text>
+        <TouchableOpacity
+          style={[styles(colors).btn, { marginTop: 28, width: '100%', maxWidth: 320 }]}
+          onPress={() => {
+            if (typeof window !== 'undefined') {
+              window.open('https://www.netflix.com', '_blank');
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles(colors).btnText}>OPEN NETFLIX</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setApiUrl(null)}
+          style={{ marginTop: 16 }}
+        >
+          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Change API URL</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -495,5 +514,8 @@ const styles = (colors: ReturnType<typeof useColors>) =>
       fontFamily: 'Inter_400Regular',
       textAlign: 'center',
       lineHeight: 24,
+    },
+    webSuccessBadge: {
+      marginBottom: 20,
     },
   });
