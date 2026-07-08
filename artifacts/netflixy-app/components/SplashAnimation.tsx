@@ -35,7 +35,7 @@ export function SplashAnimation({ children }: Props) {
         duration: 500,
         delay: 100,
         easing: Easing.out(Easing.quad),
-        useNativeDriver: false, // width can't use native driver
+        useNativeDriver: true, // scaleX is a transform, native driver OK
       }).start(() => {
         // 3. Hold, then fade the whole splash out
         Animated.timing(containerOpacity, {
@@ -64,10 +64,7 @@ export function SplashAnimation({ children }: Props) {
             style={[
               styles.line,
               {
-                width: lineWidth.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0%', '100%'],
-                }),
+                transform: [{ scaleX: lineWidth }],
               },
             ]}
           />

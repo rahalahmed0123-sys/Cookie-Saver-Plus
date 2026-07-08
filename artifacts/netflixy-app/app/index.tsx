@@ -17,10 +17,14 @@ import * as Haptics from 'expo-haptics';
 import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/useColors';
 
-// Lazy-load WebView only on native to avoid web crashes
+// Lazy-load WebView only on native, with error guard
 let WebView: any = null;
 if (Platform.OS !== 'web') {
-  WebView = require('react-native-webview').WebView;
+  try {
+    WebView = require('react-native-webview').WebView;
+  } catch {
+    // WebView not available in this environment
+  }
 }
 
 // ─── Setup Screen ─────────────────────────────────────────────────────────────
