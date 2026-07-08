@@ -1,32 +1,15 @@
-import { Platform, ScrollView, ScrollViewProps } from 'react-native';
-import {
-  KeyboardAwareScrollView,
-  KeyboardAwareScrollViewProps,
-} from 'react-native-keyboard-controller';
-
-type Props = KeyboardAwareScrollViewProps & ScrollViewProps;
+// react-native-keyboard-controller removed (not Expo Go compatible).
+// Simple ScrollView wrapper that works everywhere.
+import { ScrollView, ScrollViewProps } from 'react-native';
 
 export function KeyboardAwareScrollViewCompat({
   children,
   keyboardShouldPersistTaps = 'handled',
   ...props
-}: Props) {
-  if (Platform.OS === 'web') {
-    return (
-      <ScrollView
-        keyboardShouldPersistTaps={keyboardShouldPersistTaps}
-        {...props}
-      >
-        {children}
-      </ScrollView>
-    );
-  }
+}: ScrollViewProps & { keyboardShouldPersistTaps?: 'handled' | 'always' | 'never' }) {
   return (
-    <KeyboardAwareScrollView
-      keyboardShouldPersistTaps={keyboardShouldPersistTaps}
-      {...props}
-    >
+    <ScrollView keyboardShouldPersistTaps={keyboardShouldPersistTaps} {...props}>
       {children}
-    </KeyboardAwareScrollView>
+    </ScrollView>
   );
 }
