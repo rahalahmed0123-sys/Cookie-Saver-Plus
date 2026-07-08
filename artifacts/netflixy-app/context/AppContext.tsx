@@ -35,18 +35,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (initialized && apiUrl) {
-      fetchSession();
-    }
+    if (initialized && apiUrl) fetchSession();
   }, [initialized, apiUrl]);
 
   const setApiUrl = async (url: string | null) => {
     const clean = url ? url.trim().replace(/\/+$/, '') : null;
-    if (clean) {
-      await AsyncStorage.setItem('netflixy_api_url', clean);
-    } else {
-      await AsyncStorage.removeItem('netflixy_api_url');
-    }
+    if (clean) await AsyncStorage.setItem('netflixy_api_url', clean);
+    else await AsyncStorage.removeItem('netflixy_api_url');
     setApiUrlState(clean);
     setSession(null);
     setError(null);
@@ -62,8 +57,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const data: Session = await res.json();
       setSession(data);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to connect';
-      setError(msg);
+      setError(e instanceof Error ? e.message : 'Failed to connect');
     } finally {
       setLoading(false);
     }

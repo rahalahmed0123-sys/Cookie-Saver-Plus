@@ -1,4 +1,3 @@
-import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,163 +7,98 @@ import {
   ActivityIndicator,
   Platform,
   StatusBar,
-  Animated,
-  Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useApp } from '@/context/AppContext';
-import { useColors } from '@/hooks/useColors';
 
-// Lazy-load WebView only on native, with error guard
+// Only load WebView on native
 let WebView: any = null;
 if (Platform.OS !== 'web') {
-  try {
-    WebView = require('react-native-webview').WebView;
-  } catch {
-    // WebView not available in this environment
-  }
+  try { WebView = require('react-native-webview').WebView; } catch {}
 }
 
-// ─── Setup Screen ─────────────────────────────────────────────────────────────
-function SetupScreen() {
-  const colors = useColors();
+// ─── Colours ──────────────────────────────────────────────────────────────────
+const C = {
+  bg: '#000',
+  card: '#111',
+  border: '#222',
+  primary: '#E50914',
+  fg: '#fff',
+  muted: '#888',
+};
+
+// ─── Setup ────────────────────────────────────────────────────────────────────
+function Setup() {
+  const { setApiUrl } = useApp();
   const insets = useSafeAreaInsets();
-  const { setApiUrl, loading } = useApp();
-  const [url, setUrl] = useState('');
-  const [connecting, setConnecting] = useState(false);
-  const [err, setErr] = useState('');
-  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const [url, setUrl] = require('react').useState('');
+  const [busy, setBusy] = require('react').useState(false);
+  const [err, setErr] = require('react').useState('');
 
-  const shake = () => {
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true, easing: Easing.linear }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true, easing: Easing.linear }),
-      Animated.timing(shakeAnim, { toValue: 6, duration: 60, useNativeDriver: true, easing: Easing.linear }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true, easing: Easing.linear }),
-    ]).start();
-  };
-
-  const handleConnect = async () => {
-    const trimmed = url.trim().replace(/\/+$/, '');
-    if (!trimmed) {
-      setErr('Paste your API URL first');
-      shake();
-      return;
-    }
-    if (!trimmed.startsWith('http')) {
-      setErr('URL must start with http:// or https://');
-      shake();
-      return;
-    }
-    setConnecting(true);
-    setErr('');
+  const connect = async () => {
+    const clean = url.trim().replace(/\/+$/, '');
+    if (!clean.startsWith('http')) { setErr('Enter a valid URL starting with http'); return; }
+    setBusy(true); setErr('');
     try {
-      const res = await fetch(`${trimmed}/api/access`);
-      if (!res.ok) throw new Error(`Server returned ${res.status}`);
-      await res.json();
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await setApiUrl(trimmed);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Could not reach server';
-      setErr(msg);
-      shake();
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
-      setConnecting(false);
-    }
+      const r = await fetch(`${clean}/api/access`);
+      if (!r.ok) throw new Error(`Server error ${r.status}`);
+      await r.json();
+      await setApiUrl(clean);
+    } catch (e: any) {
+      setErr(e.message || 'Could not reach server');
+    } finally { setBusy(false); }
   };
-
-  const s = styles(colors);
 
   return (
-    <View style={[s.setupContainer, { paddingTop: Math.max(insets.top + 40, Platform.OS === 'web' ? 107 : 40) }]}>
+    <View style={[s.screen, { paddingTop: insets.top + 40 }]}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
-
-      {/* Logo */}
-      <View style={s.logoWrap}>
-        <View style={s.logoCircle}>
-          <Text style={s.logoLetter}>N</Text>
-        </View>
-        <Text style={s.logoName}>NETFLIXY</Text>
+      <View style={s.logoBox}>
+        <View style={s.logoCircle}><Text style={s.logoN}>N</Text></View>
+        <Text style={s.logoText}>NETFLIXY</Text>
       </View>
-
       <Text style={s.tagline}>Your sessions. Your stream.</Text>
 
-      {/* Card */}
-      <Animated.View style={[s.card, { transform: [{ translateX: shakeAnim }] }]}>
+      <View style={s.card}>
         <Text style={s.label}>API SERVER URL</Text>
         <TextInput
           style={s.input}
           value={url}
-          onChangeText={(t) => { setUrl(t); setErr(''); }}
+          onChangeText={t => { setUrl(t); setErr(''); }}
           placeholder="https://your-api.replit.app"
-          placeholderTextColor={colors.mutedForeground}
+          placeholderTextColor={C.muted}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
           returnKeyType="go"
-          onSubmitEditing={handleConnect}
+          onSubmitEditing={connect}
         />
-        {err ? <Text style={s.errorText}>{err}</Text> : null}
-        <TouchableOpacity
-          style={[s.btn, (connecting || loading) && s.btnDisabled]}
-          onPress={handleConnect}
-          disabled={connecting || loading}
-          activeOpacity={0.8}
-        >
-          {connecting ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={s.btnText}>CONNECT</Text>
-          )}
+        {!!err && <Text style={s.err}>{err}</Text>}
+        <TouchableOpacity style={[s.btn, busy && { opacity: 0.5 }]} onPress={connect} disabled={busy} activeOpacity={0.8}>
+          {busy ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnText}>CONNECT</Text>}
         </TouchableOpacity>
-      </Animated.View>
-
-      <Text style={s.hint}>
-        Paste the URL of your deployed Netflixy API server
-      </Text>
+      </View>
+      <Text style={s.hint}>Paste the URL of your deployed Netflixy API server</Text>
     </View>
   );
 }
 
-// ─── Player Screen ─────────────────────────────────────────────────────────────
-function PlayerScreen({ cookieValue }: { cookieValue: string }) {
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
+// ─── Player ───────────────────────────────────────────────────────────────────
+function Player({ cookie }: { cookie: string }) {
   const { setApiUrl, fetchSession } = useApp();
-  const [showSettings, setShowSettings] = useState(false);
-  const [webViewKey, setWebViewKey] = useState(0);
-
-  const cookieHeader = `NetflixId=${cookieValue}`;
+  const insets = useSafeAreaInsets();
+  const [menu, setMenu] = require('react').useState(false);
+  const [key, setKey] = require('react').useState(0);
 
   if (Platform.OS === 'web') {
     return (
-      <View style={[styles(colors).webFallback, { paddingTop: Math.max(insets.top, 107) }]}>
-        <View style={styles(colors).webSuccessBadge}>
-          <Feather name="check-circle" size={40} color={colors.primary} />
-        </View>
-        <Text style={styles(colors).webFallbackTitle}>Session Ready</Text>
-        <Text style={styles(colors).webFallbackText}>
-          Cookie fetched successfully. On a phone this opens Netflix automatically — on desktop, click below to open Netflix in a new tab, then paste the cookie manually if needed.
-        </Text>
-        <TouchableOpacity
-          style={[styles(colors).btn, { marginTop: 28, width: '100%', maxWidth: 320 }]}
-          onPress={() => {
-            if (typeof window !== 'undefined') {
-              window.open('https://www.netflix.com', '_blank');
-            }
-          }}
-          activeOpacity={0.8}
-        >
-          <Text style={styles(colors).btnText}>OPEN NETFLIX</Text>
+      <View style={[s.screen, s.center]}>
+        <Text style={s.title}>Session Ready ✓</Text>
+        <Text style={[s.tagline, { marginBottom: 24 }]}>Cookie loaded. Click below to open Netflix.</Text>
+        <TouchableOpacity style={s.btn} onPress={() => (window as any).open('https://www.netflix.com', '_blank')} activeOpacity={0.8}>
+          <Text style={s.btnText}>OPEN NETFLIX</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setApiUrl(null)}
-          style={{ marginTop: 16 }}
-        >
-          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Change API URL</Text>
+        <TouchableOpacity onPress={() => setApiUrl(null)} style={{ marginTop: 16 }}>
+          <Text style={{ color: C.muted, fontSize: 13 }}>Change API URL</Text>
         </TouchableOpacity>
       </View>
     );
@@ -173,14 +107,9 @@ function PlayerScreen({ cookieValue }: { cookieValue: string }) {
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <StatusBar hidden />
-
-      {/* Full-screen WebView with cookie as initial request header */}
       <WebView
-        key={webViewKey}
-        source={{
-          uri: 'https://www.netflix.com/browse',
-          headers: { Cookie: cookieHeader },
-        }}
+        key={key}
+        source={{ uri: 'https://www.netflix.com/browse', headers: { Cookie: `NetflixId=${cookie}` } }}
         style={{ flex: 1 }}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
@@ -190,49 +119,25 @@ function PlayerScreen({ cookieValue }: { cookieValue: string }) {
         domStorageEnabled
         startInLoadingState
         renderLoading={() => (
-          <View style={styles(colors).loaderOverlay}>
-            <ActivityIndicator color={colors.primary} size="large" />
+          <View style={[s.screen, s.center, StyleSheet.absoluteFillObject]}>
+            <ActivityIndicator color={C.primary} size="large" />
           </View>
         )}
       />
-
-      {/* Floating settings button */}
-      {!showSettings ? (
-        <TouchableOpacity
-          style={[styles(colors).fab, { bottom: insets.bottom + 20, right: 16 }]}
-          onPress={() => setShowSettings(true)}
-          activeOpacity={0.8}
-        >
-          <Feather name="settings" size={18} color="#fff" />
+      {!menu ? (
+        <TouchableOpacity style={[s.fab, { bottom: insets.bottom + 20 }]} onPress={() => setMenu(true)}>
+          <Text style={{ color: '#fff', fontSize: 18 }}>⚙</Text>
         </TouchableOpacity>
       ) : (
-        <View style={[styles(colors).settingsPanel, { bottom: insets.bottom + 16, right: 16, left: 16 }]}>
-          <TouchableOpacity
-            style={styles(colors).settingsBtn}
-            onPress={async () => {
-              setShowSettings(false);
-              await fetchSession();
-              setWebViewKey((k) => k + 1);
-            }}
-          >
-            <Feather name="refresh-cw" size={14} color="#fff" />
-            <Text style={styles(colors).settingsBtnText}>New Session</Text>
+        <View style={[s.menuPanel, { bottom: insets.bottom + 16 }]}>
+          <TouchableOpacity style={s.menuBtn} onPress={async () => { setMenu(false); await fetchSession(); setKey(k => k + 1); }}>
+            <Text style={s.menuBtnText}>↻  New Session</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles(colors).settingsBtn, styles(colors).settingsBtnDanger]}
-            onPress={() => {
-              setShowSettings(false);
-              setApiUrl(null);
-            }}
-          >
-            <Feather name="link" size={14} color="#fff" />
-            <Text style={styles(colors).settingsBtnText}>Change API URL</Text>
+          <TouchableOpacity style={s.menuBtn} onPress={() => { setMenu(false); setApiUrl(null); }}>
+            <Text style={s.menuBtnText}>⇄  Change API URL</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles(colors).settingsDismiss}
-            onPress={() => setShowSettings(false)}
-          >
-            <Text style={styles(colors).settingsDismissText}>Cancel</Text>
+          <TouchableOpacity style={s.menuDismiss} onPress={() => setMenu(false)}>
+            <Text style={{ color: C.muted }}>Cancel</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -240,286 +145,68 @@ function PlayerScreen({ cookieValue }: { cookieValue: string }) {
   );
 }
 
-// ─── No Sessions Screen ────────────────────────────────────────────────────────
-function NoSessionsScreen() {
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const { fetchSession, loading, setApiUrl } = useApp();
-
-  return (
-    <View style={[styles(colors).centerScreen, { paddingTop: Platform.OS === 'web' ? 107 : insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
-      <Feather name="tv" size={48} color={colors.mutedForeground} />
-      <Text style={styles(colors).noSessionTitle}>No Active Sessions</Text>
-      <Text style={styles(colors).noSessionText}>
-        Go to the admin panel and activate at least one cookie session.
-      </Text>
-      <TouchableOpacity style={styles(colors).retryBtn} onPress={fetchSession} disabled={loading} activeOpacity={0.8}>
-        {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles(colors).retryBtnText}>Retry</Text>}
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => setApiUrl(null)} style={{ marginTop: 12 }}>
-        <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Change API URL</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
 // ─── Root ──────────────────────────────────────────────────────────────────────
 export default function Index() {
-  const colors = useColors();
   const { apiUrl, session, loading, error, initialized, fetchSession, setApiUrl } = useApp();
+  const insets = useSafeAreaInsets();
 
-  if (!initialized) {
-    return (
-      <View style={[styles(colors).centerScreen]}>
-        <ActivityIndicator color={colors.primary} size="large" />
-      </View>
-    );
-  }
+  if (!initialized) return <View style={[s.screen, s.center]}><ActivityIndicator color={C.primary} size="large" /></View>;
+  if (!apiUrl) return <Setup />;
 
-  if (!apiUrl) return <SetupScreen />;
+  if (loading && !session) return (
+    <View style={[s.screen, s.center]}>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <ActivityIndicator color={C.primary} size="large" />
+      <Text style={[s.muted, { marginTop: 12 }]}>Connecting…</Text>
+    </View>
+  );
 
-  if (loading && !session) {
-    return (
-      <View style={styles(colors).centerScreen}>
-        <StatusBar barStyle="light-content" backgroundColor="#000" />
-        <ActivityIndicator color={colors.primary} size="large" />
-        <Text style={[styles(colors).noSessionText, { marginTop: 16 }]}>Connecting...</Text>
-      </View>
-    );
-  }
+  if (error) return (
+    <View style={[s.screen, s.center]}>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <Text style={s.title}>Connection Failed</Text>
+      <Text style={[s.muted, { textAlign: 'center', marginBottom: 24 }]}>{error}</Text>
+      <TouchableOpacity style={s.btn} onPress={fetchSession}><Text style={s.btnText}>Retry</Text></TouchableOpacity>
+      <TouchableOpacity onPress={() => setApiUrl(null)} style={{ marginTop: 12 }}><Text style={{ color: C.muted, fontSize: 13 }}>Change URL</Text></TouchableOpacity>
+    </View>
+  );
 
-  if (error) {
-    return (
-      <View style={styles(colors).centerScreen}>
-        <StatusBar barStyle="light-content" backgroundColor="#000" />
-        <Feather name="wifi-off" size={48} color={colors.mutedForeground} />
-        <Text style={styles(colors).noSessionTitle}>Connection Failed</Text>
-        <Text style={styles(colors).noSessionText}>{error}</Text>
-        <TouchableOpacity style={styles(colors).retryBtn} onPress={fetchSession} activeOpacity={0.8}>
-          {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles(colors).retryBtnText}>Retry</Text>}
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setApiUrl(null)} style={{ marginTop: 12 }}>
-          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Change URL</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  if (!session?.found || !session?.cookieValue) return (
+    <View style={[s.screen, s.center]}>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <Text style={s.title}>No Active Sessions</Text>
+      <Text style={[s.muted, { textAlign: 'center', marginBottom: 24 }]}>Activate a session in the admin panel first.</Text>
+      <TouchableOpacity style={s.btn} onPress={fetchSession} disabled={loading}>
+        {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.btnText}>Retry</Text>}
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => setApiUrl(null)} style={{ marginTop: 12 }}><Text style={{ color: C.muted, fontSize: 13 }}>Change URL</Text></TouchableOpacity>
+    </View>
+  );
 
-  if (!session || !session.found || !session.cookieValue) {
-    return <NoSessionsScreen />;
-  }
-
-  return <PlayerScreen cookieValue={session.cookieValue} />;
+  return <Player cookie={session.cookieValue} />;
 }
 
-// ─── Styles ────────────────────────────────────────────────────────────────────
-const styles = (colors: ReturnType<typeof useColors>) =>
-  StyleSheet.create({
-    setupContainer: {
-      flex: 1,
-      backgroundColor: colors.background,
-      paddingHorizontal: 24,
-      alignItems: 'center',
-    },
-    logoWrap: {
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    logoCircle: {
-      width: 72,
-      height: 72,
-      borderRadius: 12,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 12,
-    },
-    logoLetter: {
-      color: '#fff',
-      fontSize: 42,
-      fontFamily: 'Inter_700Bold',
-      lineHeight: 48,
-    },
-    logoName: {
-      color: colors.foreground,
-      fontSize: 18,
-      fontFamily: 'Inter_700Bold',
-      letterSpacing: 6,
-    },
-    tagline: {
-      color: colors.mutedForeground,
-      fontSize: 14,
-      fontFamily: 'Inter_400Regular',
-      marginTop: 8,
-      marginBottom: 40,
-    },
-    card: {
-      width: '100%',
-      backgroundColor: colors.card,
-      borderRadius: 8,
-      padding: 20,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    label: {
-      color: colors.mutedForeground,
-      fontSize: 11,
-      fontFamily: 'Inter_600SemiBold',
-      letterSpacing: 2,
-      marginBottom: 10,
-    },
-    input: {
-      backgroundColor: colors.muted,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 6,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      color: colors.foreground,
-      fontFamily: 'Inter_400Regular',
-      fontSize: 14,
-      marginBottom: 8,
-    },
-    errorText: {
-      color: colors.primary,
-      fontSize: 12,
-      fontFamily: 'Inter_400Regular',
-      marginBottom: 12,
-    },
-    btn: {
-      backgroundColor: colors.primary,
-      borderRadius: 6,
-      paddingVertical: 14,
-      alignItems: 'center',
-      marginTop: 4,
-    },
-    btnDisabled: {
-      opacity: 0.5,
-    },
-    btnText: {
-      color: '#fff',
-      fontSize: 14,
-      fontFamily: 'Inter_700Bold',
-      letterSpacing: 2,
-    },
-    hint: {
-      color: colors.mutedForeground,
-      fontSize: 12,
-      fontFamily: 'Inter_400Regular',
-      marginTop: 20,
-      textAlign: 'center',
-    },
-    centerScreen: {
-      flex: 1,
-      backgroundColor: colors.background,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 32,
-    },
-    noSessionTitle: {
-      color: colors.foreground,
-      fontSize: 20,
-      fontFamily: 'Inter_700Bold',
-      marginTop: 16,
-      marginBottom: 8,
-    },
-    noSessionText: {
-      color: colors.mutedForeground,
-      fontSize: 14,
-      fontFamily: 'Inter_400Regular',
-      textAlign: 'center',
-      lineHeight: 22,
-    },
-    retryBtn: {
-      marginTop: 24,
-      backgroundColor: colors.primary,
-      paddingHorizontal: 32,
-      paddingVertical: 12,
-      borderRadius: 6,
-    },
-    retryBtnText: {
-      color: '#fff',
-      fontFamily: 'Inter_700Bold',
-      fontSize: 14,
-      letterSpacing: 1,
-    },
-    loaderOverlay: {
-      position: 'absolute',
-      inset: 0,
-      backgroundColor: '#000',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    fab: {
-      position: 'absolute',
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: 'rgba(0,0,0,0.7)',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.15)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    settingsPanel: {
-      position: 'absolute',
-      backgroundColor: '#1a1a1a',
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: '#333',
-      padding: 8,
-      gap: 4,
-    },
-    settingsBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      borderRadius: 8,
-      backgroundColor: '#2a2a2a',
-    },
-    settingsBtnDanger: {
-      backgroundColor: '#2a2a2a',
-    },
-    settingsBtnText: {
-      color: '#fff',
-      fontFamily: 'Inter_500Medium',
-      fontSize: 14,
-    },
-    settingsDismiss: {
-      alignItems: 'center',
-      paddingVertical: 10,
-    },
-    settingsDismissText: {
-      color: '#8c8c8c',
-      fontFamily: 'Inter_400Regular',
-      fontSize: 14,
-    },
-    webFallback: {
-      flex: 1,
-      backgroundColor: '#000',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 32,
-      paddingBottom: 34,
-    },
-    webFallbackTitle: {
-      color: '#fff',
-      fontSize: 22,
-      fontFamily: 'Inter_700Bold',
-      marginTop: 20,
-      marginBottom: 10,
-    },
-    webFallbackText: {
-      color: '#8c8c8c',
-      fontSize: 15,
-      fontFamily: 'Inter_400Regular',
-      textAlign: 'center',
-      lineHeight: 24,
-    },
-    webSuccessBadge: {
-      marginBottom: 20,
-    },
-  });
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 24 },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  logoBox: { alignItems: 'center', marginBottom: 8 },
+  logoCircle: { width: 72, height: 72, borderRadius: 14, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  logoN: { color: '#fff', fontSize: 44, fontFamily: 'Inter_700Bold', lineHeight: 52 },
+  logoText: { color: C.fg, fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: 6 },
+  tagline: { color: C.muted, fontSize: 14, fontFamily: 'Inter_400Regular', marginTop: 8, marginBottom: 36, textAlign: 'center' },
+  card: { width: '100%', backgroundColor: C.card, borderRadius: 10, padding: 20, borderWidth: 1, borderColor: C.border },
+  label: { color: C.muted, fontSize: 11, fontFamily: 'Inter_600SemiBold', letterSpacing: 2, marginBottom: 10 },
+  input: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12, color: C.fg, fontFamily: 'Inter_400Regular', fontSize: 14, marginBottom: 8 },
+  err: { color: C.primary, fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 10 },
+  btn: { backgroundColor: C.primary, borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  btnText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_700Bold', letterSpacing: 2 },
+  hint: { color: C.muted, fontSize: 12, textAlign: 'center', marginTop: 20, fontFamily: 'Inter_400Regular' },
+  title: { color: C.fg, fontSize: 22, fontFamily: 'Inter_700Bold', marginBottom: 8 },
+  muted: { color: C.muted, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  fab: { position: 'absolute', right: 16, width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(0,0,0,0.75)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  menuPanel: { position: 'absolute', left: 16, right: 16, backgroundColor: '#1a1a1a', borderRadius: 12, borderWidth: 1, borderColor: '#333', padding: 8, gap: 4 },
+  menuBtn: { paddingVertical: 13, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#2a2a2a' },
+  menuBtnText: { color: C.fg, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  menuDismiss: { alignItems: 'center', paddingVertical: 10 },
+});
